@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# -*- coding: UTF-8 -*-
 # sonar_to_costmap.py
 # ################################################################################
 # edited WHS, OJ , 23.12.2020 #
@@ -37,7 +38,9 @@ import std_msgs.msg
 import rostopic
 from geometry_msgs.msg import Point32
 from sensor_msgs.msg import Range
+import turtlebot3_msgs
 from turtlebot3_msgs.msg import SensorState
+print(turtlebot3_msgs.__file__)
 from sensor_msgs.msg import PointCloud  # Message für die Sonar-Hindernisse
 from nav_msgs.msg import Odometry
 
@@ -60,6 +63,7 @@ class Sonar_to_Point_Cloud():
                                                SensorState,
                                                self.get_sonar,
                                                queue_size=10)
+
         # receive odom for speed
         self.sonar_sub_left = rospy.Subscriber('odom',
                                                Odometry,
@@ -69,6 +73,7 @@ class Sonar_to_Point_Cloud():
         self.ros_hz = rostopic.ROSTopicHz(-1)
         rospy.Subscriber('/sensor_state', rospy.AnyMsg, self.ros_hz.callback_hz, callback_args='/sensor_state')
         self.dist_sonars3 = 0.0
+        self.dist_sonars1 = 0.0
 
 
         self.window_size = 20 
@@ -77,6 +82,9 @@ class Sonar_to_Point_Cloud():
 
         self.old_dists3 = [-1] * 2
 
+        self.dists_sonars1 = [0.0] * self.window_size 
+
+        self.old_dists1 = [-1] * 2
 
         #rospy.loginfo(f" Sonar Data sonars1: {self.dists_sonars1}")
 
@@ -112,6 +120,8 @@ class Sonar_to_Point_Cloud():
         if self.robot_twist > 0.0:
             floor = False
         
+        # TODO for testing
+        floor = False
 
         return floor
 
@@ -119,43 +129,56 @@ class Sonar_to_Point_Cloud():
         self.robot_speed = round(odom.twist.twist.linear.x, 2)
         self.robot_twist = round(odom.twist.twist.angular.z, 1)
 
-    
-
 
 # TODO floor still gets detected but stable at one of the many distances
 # try making sure a distance will only be published as point cloud, if it
 # is repeatedly measured
 # add distance 0.0 to dists_sonars1 and dist_sonars1 if floor detected
 # TODO still unstable, try doing a history of 2 distances for floor checking
-    def get_sonar (self, sensor_state):
+    def get_sonar(self, sensor_state):
         try:
             self.sonar_update_frequency = round(self.ros_hz.get_hz('/sensor_state')[0], 0)
         except TypeError:
             # no data, don't need to update frequency
             pass
         #print(f'sonar update frequency: {self.sonar_update_frequency}')
-        current_dist = sensor_state.sonar / 100
+        current_dist_front = sensor_state.sonar / 100
+        current_dist_back = sensor_state.cliff / 100
         #rospy.loginfo(f'current dist: {current_dist}')
-        dists = self.dists_sonars3
+        dists_front = self.dists_sonars3
+        dists_back = self.dists_sonars1
         #if current_dist > 0.0:
-        dists.pop(0)
-        dists.append(current_dist)
-        sorted_dists = sorted(dists)
-        padded_dists = sorted_dists[self.padding:self.window_size - self.padding]
-        mean_dist = statistics.mean(padded_dists)
-        new_dist = round(mean_dist, 2)
-        if not self.is_floor(new_dist, self.old_dists3):
-            self.dist_sonars3 = new_dist
-            self.dists_sonars3 = dists
+        dists_front.pop(0)
+        dists_front.append(current_dist_front)
+        dists_back.pop(0)
+        dists_back.append(current_dist_back)
+
+        sorted_dists_front = sorted(dists_front)
+        sorted_dists_back = sorted(dists_back)
+        padded_dists_front = sorted_dists_front[self.padding:self.window_size - self.padding]
+        padded_dists_back = sorted_dists_back[self.padding:self.window_size - self.padding]
+        mean_dist_front = statistics.mean(padded_dists_front)
+        mean_dist_back = statistics.mean(padded_dists_back)
+        new_dist_front = round(mean_dist_front, 2)
+        new_dist_back = round(mean_dist_back, 2)
+        #if not self.is_floor(new_dist, self.old_dists3):
+        self.dist_sonars3 = new_dist_front
+        self.dists_sonars3 = dists_front
+        
+        self.dist_sonars1 = new_dist_back
+        self.dists_sonars1 = dists_back
         # is floor, act as if there was no detection
-        else:
-            self.dist_sonars3 = 0.0
-            self.dists_sonars3.pop(0)
-            self.dists_sonars3.append(self.dist_sonars3)
+        #else:
+        #    self.dist_sonars3 = 0.0
+        #    self.dists_sonars3.pop(0)
+        #    self.dists_sonars3.append(self.dist_sonars3)
 
         self.cloud_build()
         self.old_dists3.pop(0)
-        self.old_dists3.append(new_dist)
+        self.old_dists3.append(new_dist_front)
+        
+        self.old_dists1.pop(0)
+        self.old_dists1.append(new_dist_back)
 
     def cloud_build(self):
 
@@ -175,6 +198,7 @@ class Sonar_to_Point_Cloud():
         # /catkin_ws/src/turtlebot3/turtlebot3_navigation/param/costmap_common_params_burger.yaml
         width = 0.18
         length_forward = 0.04
+        length_backward = 0.12
         depth_of_sensor = 0.01
         angle_diagonal = math.radians(45) # convert 45°
         angle_front = math.radians(0)
@@ -201,6 +225,15 @@ class Sonar_to_Point_Cloud():
                 p3.z = 0.0
 
                 cloud.points.append(p3)
+        
+        if(self.dist_sonars1 < max_dist and self.dist_sonars1 > min_dist):
+            for i in point_range:
+                p1 = Point32()
+                p1.x = - math.cos(angle_front + i * angle_dist) * (self.dist_sonars1 + length_backward)
+                p1.y = math.sin(angle_front + i * angle_dist) * (self.dist_sonars1 + length_backward)
+                p1.z = 0.0
+
+                cloud.points.append(p1)
 
         # Senden
         self.cloud_pub.publish(cloud)

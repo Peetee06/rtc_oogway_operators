@@ -40,7 +40,6 @@ from geometry_msgs.msg import Point32
 from sensor_msgs.msg import Range
 import turtlebot3_msgs
 from turtlebot3_msgs.msg import SensorState
-print(turtlebot3_msgs.__file__)
 from sensor_msgs.msg import PointCloud  # Message für die Sonar-Hindernisse
 from nav_msgs.msg import Odometry
 

@@ -64,13 +64,20 @@ class Sonar_to_Point_Cloud():
                                                queue_size=10)
 
         # receive odom for speed
-        self.sonar_sub_left = rospy.Subscriber('odom',
-                                               Odometry,
-                                               self.update_odom,
-                                               queue_size=10)
-
+        self.odom = rospy.Subscriber('odom',
+                                     Odometry,
+                                     self.update_odom,
+                                     queue_size=10)
+        
+        # receive frequency of sensor_state topic
         self.ros_hz = rostopic.ROSTopicHz(-1)
-        rospy.Subscriber('/sensor_state', rospy.AnyMsg, self.ros_hz.callback_hz, callback_args='/sensor_state')
+        rospy.Subscriber('/sensor_state', 
+                         rospy.AnyMsg, 
+                         self.ros_hz.callback_hz, 
+                         callback_args='/sensor_state')
+
+
+
         self.dist_sonars3 = 0.0
         self.dist_sonars1 = 0.0
 
@@ -87,9 +94,9 @@ class Sonar_to_Point_Cloud():
 
         #rospy.loginfo(f" Sonar Data sonars1: {self.dists_sonars1}")
 
-        self.robot_speed = 0.11 # in m/s # TODO get actual movespeed of robot
+        self.robot_speed = 0.11 # in m/s
         self.robot_twist = 0.0
-        self.sonar_update_frequency = 20 # in Hz # TODO get actual frequency of publishing distance
+        self.sonar_update_frequency = 20 # in Hz
 
         self.rate = rospy.Rate(10)
 
@@ -225,6 +232,7 @@ class Sonar_to_Point_Cloud():
 
                 cloud.points.append(p3)
         
+        # sonars1 (hinten) BDPIN_GPIO_9, BDPIN_GPIO_10
         if(self.dist_sonars1 < max_dist and self.dist_sonars1 > min_dist):
             for i in point_range:
                 p1 = Point32()

@@ -9,3 +9,6 @@ Remember to run ```python sonar_to_costmap.py``` or add it to your launchfile to
 
 
 ```sonar_to_costmap.py.v1``` and ```sonar_to_costmap.py.v2``` are drafts containing experimental code for noise reduction. They are neither refactored nor considered working properly.
+  
+  
+The ```turtlebot_core``` was modified to work with 5 sonars. In our tests the publishing frequency of turtlebot messages decreased because of the increased load of publishing 5 additional messages. Test if your setup can handle that and the robot still operates (slamming/navigation) as desired.

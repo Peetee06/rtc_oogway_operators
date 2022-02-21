@@ -1,5 +1,6 @@
 # rtc_oogway_operators
 Code for the Ruhr Master School Turtlebot Competition of Team Oogway Operators  
+Official repository of the Ruhr Turtlebot Competition: https://github.com/ProfJust/rtc  
   
 To use this code, first modify ```costmap_common_parameters_{}.yaml``` (use the file used for your Turtlebot Version (burger/waffle))  
 add sonar to observation_sources: ```observation_sources: scan sonar```  
